@@ -5,6 +5,8 @@ require "parallel_sftp/errors"
 require "parallel_sftp/configuration"
 require "parallel_sftp/lftp_command"
 require "parallel_sftp/progress_parser"
+require "parallel_sftp/segment_progress_parser"
+require "parallel_sftp/time_estimator"
 require "parallel_sftp/download"
 require "parallel_sftp/client"
 
@@ -69,11 +71,12 @@ module ParallelSftp
     # @option options [Integer] :timeout Connection timeout in seconds
     # @option options [Integer] :max_retries Maximum retry attempts
     # @option options [Proc] :on_progress Progress callback
+    # @option options [Proc] :on_segment_progress Per-segment progress callback
     #
     # @return [String] Local path to downloaded file
     # @raise [DownloadError] if download fails
     #
-    # @example
+    # @example Basic progress
     #   ParallelSftp.download(
     #     host: 'ftp.example.com',
     #     user: 'username',
@@ -82,6 +85,23 @@ module ParallelSftp
     #     local_path: '/tmp/large_file.zip',
     #     segments: 8,
     #     on_progress: ->(info) { puts "#{info[:percent]}%" }
+    #   )
+    #
+    # @example With per-segment progress
+    #   ParallelSftp.download(
+    #     host: 'ftp.example.com',
+    #     user: 'username',
+    #     password: 'secret',
+    #     remote_path: '/path/to/large_file.zip',
+    #     local_path: '/tmp/large_file.zip',
+    #     segments: 8,
+    #     on_segment_progress: lambda do |info|
+    #       puts "Overall: #{info[:overall_percent]}% (#{info[:eta]} remaining)"
+    #       puts "Speed: #{info[:speed] / 1_000_000.0} MB/s" if info[:speed]
+    #       info[:segments].each do |seg|
+    #         puts "  Segment #{seg[:index]}: #{seg[:percent]}%"
+    #       end
+    #     end
     #   )
     def download(options = {})
       client = Client.new(
@@ -100,7 +120,8 @@ module ParallelSftp
         max_retries: options[:max_retries],
         reconnect_interval: options[:reconnect_interval],
         sftp_connect_program: options[:sftp_connect_program],
-        on_progress: options[:on_progress]
+        on_progress: options[:on_progress],
+        on_segment_progress: options[:on_segment_progress]
       )
     end
   end

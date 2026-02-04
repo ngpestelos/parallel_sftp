@@ -7,6 +7,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+- Per-segment progress tracking via `on_segment_progress` callback
+- `SegmentProgressParser` class for parsing `.lftp-pget-status` files
+- `TimeEstimator` class for calculating download speed and ETA with moving window
+- Calculated time estimates independent of lftp's reported ETA
+- Elapsed time tracking since download start
+- Average speed calculation from download start
+
 ## [0.1.0] - 2026-02-04
 
 ### Added

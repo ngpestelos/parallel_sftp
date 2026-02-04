@@ -23,6 +23,8 @@ module ParallelSftp
     # @option options [Integer] :max_retries Maximum retry attempts (default: 10)
     # @option options [Integer] :reconnect_interval Seconds between retries (default: 5)
     # @option options [Proc] :on_progress Progress callback receiving hash with :percent, :speed, etc.
+    # @option options [Proc] :on_segment_progress Per-segment progress callback receiving hash with
+    #   :total_size, :segments, :total_downloaded, :overall_percent, :speed, :eta, :elapsed
     #
     # @return [String] Local path to the downloaded file
     # @raise [DownloadError] if download fails
@@ -42,7 +44,11 @@ module ParallelSftp
         sftp_connect_program: options[:sftp_connect_program]
       )
 
-      download = Download.new(lftp_command, on_progress: options[:on_progress])
+      download = Download.new(
+        lftp_command,
+        on_progress: options[:on_progress],
+        on_segment_progress: options[:on_segment_progress]
+      )
       download.execute
     end
   end
