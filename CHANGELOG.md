@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.2.0] - 2026-02-04
+
 ### Added
 - Per-segment progress tracking via `on_segment_progress` callback
 - `SegmentProgressParser` class for parsing `.lftp-pget-status` files
