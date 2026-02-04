@@ -17,12 +17,17 @@ module ParallelSftp
     # Default SFTP port
     attr_accessor :default_port
 
+    # Custom SSH connect program for lftp (e.g., for legacy host key algorithms)
+    # Example: "ssh -o HostKeyAlgorithms=+ssh-rsa -o PubkeyAcceptedKeyTypes=+ssh-rsa"
+    attr_accessor :sftp_connect_program
+
     def initialize
       @default_segments = 4
       @timeout = 30
       @max_retries = 10
       @reconnect_interval = 5
       @default_port = 22
+      @sftp_connect_program = nil
     end
 
     # Apply large file optimizations (20GB+)

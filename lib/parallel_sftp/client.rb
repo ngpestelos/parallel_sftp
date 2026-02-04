@@ -38,7 +38,8 @@ module ParallelSftp
         resume: options.fetch(:resume, true),
         timeout: options.fetch(:timeout, ParallelSftp.configuration.timeout),
         max_retries: options.fetch(:max_retries, ParallelSftp.configuration.max_retries),
-        reconnect_interval: options.fetch(:reconnect_interval, ParallelSftp.configuration.reconnect_interval)
+        reconnect_interval: options.fetch(:reconnect_interval, ParallelSftp.configuration.reconnect_interval),
+        sftp_connect_program: options[:sftp_connect_program]
       )
 
       download = Download.new(lftp_command, on_progress: options[:on_progress])

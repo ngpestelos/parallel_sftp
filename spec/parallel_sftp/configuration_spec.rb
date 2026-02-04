@@ -25,6 +25,10 @@ RSpec.describe ParallelSftp::Configuration do
     it "has default_port of 22" do
       expect(config.default_port).to eq(22)
     end
+
+    it "has sftp_connect_program of nil" do
+      expect(config.sftp_connect_program).to be_nil
+    end
   end
 
   describe "attribute accessors" do
@@ -51,6 +55,12 @@ RSpec.describe ParallelSftp::Configuration do
     it "allows setting default_port" do
       config.default_port = 2222
       expect(config.default_port).to eq(2222)
+    end
+
+    it "allows setting sftp_connect_program" do
+      ssh_opts = "ssh -o HostKeyAlgorithms=+ssh-rsa -o PubkeyAcceptedKeyTypes=+ssh-rsa"
+      config.sftp_connect_program = ssh_opts
+      expect(config.sftp_connect_program).to eq(ssh_opts)
     end
   end
 

@@ -101,6 +101,51 @@ RSpec.describe ParallelSftp::LftpCommand do
         expect(command.to_script).to include("pget -n 8")
       end
     end
+
+    context "without sftp_connect_program" do
+      it "does not include connect-program setting" do
+        expect(command.to_script).not_to include("sftp:connect-program")
+      end
+    end
+
+    context "with sftp_connect_program option" do
+      let(:ssh_opts) { "ssh -o HostKeyAlgorithms=+ssh-rsa -o PubkeyAcceptedKeyTypes=+ssh-rsa" }
+      let(:command) { described_class.new(options.merge(sftp_connect_program: ssh_opts)) }
+
+      it "includes the connect-program setting" do
+        expect(command.to_script).to include("set sftp:connect-program \"#{ssh_opts}\"")
+      end
+
+      it "places connect-program before the open command" do
+        script = command.to_script
+        connect_program_pos = script.index("sftp:connect-program")
+        open_pos = script.index("open -p")
+        expect(connect_program_pos).to be < open_pos
+      end
+    end
+
+    context "with global sftp_connect_program configuration" do
+      let(:ssh_opts) { "ssh -o HostKeyAlgorithms=+ssh-rsa" }
+
+      before do
+        ParallelSftp.configure do |config|
+          config.sftp_connect_program = ssh_opts
+        end
+      end
+
+      after { ParallelSftp.reset_configuration! }
+
+      it "uses global config when not specified per-call" do
+        expect(command.to_script).to include("HostKeyAlgorithms=+ssh-rsa")
+      end
+
+      it "allows per-call override" do
+        custom_ssh = "ssh -o StrictHostKeyChecking=no"
+        custom_command = described_class.new(options.merge(sftp_connect_program: custom_ssh))
+        expect(custom_command.to_script).to include("StrictHostKeyChecking=no")
+        expect(custom_command.to_script).not_to include("HostKeyAlgorithms")
+      end
+    end
   end
 
   describe "#to_command" do

@@ -99,6 +99,7 @@ module ParallelSftp
         timeout: options[:timeout],
         max_retries: options[:max_retries],
         reconnect_interval: options[:reconnect_interval],
+        sftp_connect_program: options[:sftp_connect_program],
         on_progress: options[:on_progress]
       )
     end
