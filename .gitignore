@@ -1,0 +1,18 @@
+/.bundle/
+/.yardoc
+/_yardoc/
+/coverage/
+/doc/
+/pkg/
+/spec/reports/
+/tmp/
+/.gems/
+
+# rspec failure tracking
+.rspec_status
+
+# Gem build artifacts
+*.gem
+
+# Bundler lockfile (optional - include if you want deterministic builds)
+# Gemfile.lock
