@@ -44,4 +44,15 @@ module ParallelSftp
       super(msg || "File integrity check failed. Expected: #{expected_size}, Got: #{actual_size}")
     end
   end
+
+  # Raised when zip file integrity check fails (segment boundary corruption)
+  class ZipIntegrityError < IntegrityError
+    attr_reader :path, :output
+
+    def initialize(msg = nil, path: nil, output: nil)
+      @path = path
+      @output = output
+      super(msg || "Zip integrity check failed#{path ? ": #{path}" : ""}")
+    end
+  end
 end

@@ -142,6 +142,23 @@ module ParallelSftp
           output: @output_buffer.join
         )
       end
+
+      # Verify zip integrity if applicable
+      verify_zip_integrity if lftp_command.local_path.end_with?(".zip")
+    end
+
+    def verify_zip_integrity
+      path = lftp_command.local_path
+      output, status = Open3.capture2e("unzip", "-t", path)
+
+      unless status.success?
+        error_lines = output.lines.grep(/error:|bad zipfile|invalid compressed/).first(5).join
+        raise ZipIntegrityError.new(
+          "Zip file corrupted (possible segment boundary issue)",
+          path: path,
+          output: error_lines
+        )
+      end
     end
   end
 end

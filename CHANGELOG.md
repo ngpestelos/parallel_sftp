@@ -7,6 +7,19 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.3.0] - 2026-02-05
+
+### Added
+- `ZipIntegrityError` class for zip file corruption detection
+- Automatic zip integrity verification using `unzip -t` after download
+- Auto-retry on zip corruption with parallel-first strategy
+- New `retry_on_corruption` option (default: true) to enable/disable auto-retry
+- New `parallel_retries` option (default: 2) - retries with same segment count before reducing
+
+### Changed
+- Downloads now verify zip integrity before returning success
+- Corrupted downloads are automatically cleaned up before retry
+
 ## [0.2.0] - 2026-02-04
 
 ### Added

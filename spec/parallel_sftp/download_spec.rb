@@ -91,6 +91,78 @@ RSpec.describe ParallelSftp::Download do
         end
       end
     end
+
+    context "when zip file is corrupted" do
+      let(:wait_thr) { instance_double(Process::Waiter, value: double(success?: true, exitstatus: 0)) }
+      let(:unzip_status) { instance_double(Process::Status, success?: false) }
+
+      before do
+        allow(Open3).to receive(:popen2e).and_yield(
+          instance_double(IO, close: nil),
+          StringIO.new("Done\n"),
+          wait_thr
+        )
+        allow(File).to receive(:exist?).with("/tmp/test_file.zip").and_return(true)
+        allow(Open3).to receive(:capture2e)
+          .with("unzip", "-t", "/tmp/test_file.zip")
+          .and_return(["error: invalid compressed data\nbad zipfile offset\n", unzip_status])
+      end
+
+      it "raises ZipIntegrityError" do
+        expect { download.execute }.to raise_error(ParallelSftp::ZipIntegrityError) do |error|
+          expect(error.message).to include("segment boundary")
+          expect(error.path).to eq("/tmp/test_file.zip")
+          expect(error.output).to include("invalid compressed data")
+        end
+      end
+    end
+
+    context "when zip file is valid" do
+      let(:wait_thr) { instance_double(Process::Waiter, value: double(success?: true, exitstatus: 0)) }
+      let(:unzip_status) { instance_double(Process::Status, success?: true) }
+
+      before do
+        allow(Open3).to receive(:popen2e).and_yield(
+          instance_double(IO, close: nil),
+          StringIO.new("Done\n"),
+          wait_thr
+        )
+        allow(File).to receive(:exist?).with("/tmp/test_file.zip").and_return(true)
+        allow(Open3).to receive(:capture2e)
+          .with("unzip", "-t", "/tmp/test_file.zip")
+          .and_return(["No errors detected in compressed data of test_file.zip\n", unzip_status])
+      end
+
+      it "returns the local path" do
+        expect(download.execute).to eq("/tmp/test_file.zip")
+      end
+    end
+
+    context "when downloaded file is not a zip" do
+      let(:lftp_command) do
+        instance_double(
+          ParallelSftp::LftpCommand,
+          to_command: ["lftp", "-c", "script"],
+          local_path: "/tmp/test_file.txt",
+          remote_path: "/remote/file.txt"
+        )
+      end
+      let(:wait_thr) { instance_double(Process::Waiter, value: double(success?: true, exitstatus: 0)) }
+
+      before do
+        allow(Open3).to receive(:popen2e).and_yield(
+          instance_double(IO, close: nil),
+          StringIO.new("Done\n"),
+          wait_thr
+        )
+        allow(File).to receive(:exist?).with("/tmp/test_file.txt").and_return(true)
+      end
+
+      it "skips zip verification" do
+        expect(Open3).not_to receive(:capture2e).with("unzip", anything, anything)
+        expect(download.execute).to eq("/tmp/test_file.txt")
+      end
+    end
   end
 
   describe "progress callback" do

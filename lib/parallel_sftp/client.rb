@@ -1,9 +1,14 @@
 # frozen_string_literal: true
 
+require "fileutils"
+
 module ParallelSftp
   # SFTP client for parallel downloads
   class Client
     attr_reader :host, :user, :password, :port
+
+    # Default number of times to retry with same segment count before reducing
+    DEFAULT_PARALLEL_RETRIES = 2
 
     def initialize(options = {})
       @host = options.fetch(:host)
@@ -25,10 +30,58 @@ module ParallelSftp
     # @option options [Proc] :on_progress Progress callback receiving hash with :percent, :speed, etc.
     # @option options [Proc] :on_segment_progress Per-segment progress callback receiving hash with
     #   :total_size, :segments, :total_downloaded, :overall_percent, :speed, :eta, :elapsed
+    # @option options [Boolean] :retry_on_corruption Auto-retry on zip corruption (default: true)
+    # @option options [Integer] :parallel_retries Times to retry with same segments before reducing (default: 2)
     #
     # @return [String] Local path to the downloaded file
     # @raise [DownloadError] if download fails
+    # @raise [ZipIntegrityError] if zip corruption persists after all retries
     def download(remote_path, local_path, options = {})
+      segments = options.fetch(:segments, ParallelSftp.configuration.default_segments)
+      retry_on_corruption = options.fetch(:retry_on_corruption, true)
+      parallel_retries = options.fetch(:parallel_retries, DEFAULT_PARALLEL_RETRIES)
+
+      return execute_download(remote_path, local_path, options.merge(segments: segments)) unless retry_on_corruption
+
+      download_with_retry(remote_path, local_path, options, segments, parallel_retries)
+    end
+
+    private
+
+    def download_with_retry(remote_path, local_path, options, segments, parallel_retries)
+      current_segments = segments
+      retries_at_current_segments = 0
+
+      loop do
+        begin
+          return execute_download(remote_path, local_path, options.merge(segments: current_segments, resume: false))
+        rescue ZipIntegrityError => e
+          cleanup_corrupted_download(local_path)
+
+          retries_at_current_segments += 1
+
+          if retries_at_current_segments < parallel_retries
+            warn "[parallel_sftp] Zip corruption detected, retrying with #{current_segments} segments " \
+                 "(attempt #{retries_at_current_segments + 1}/#{parallel_retries})..."
+          elsif current_segments > 1
+            # Reduce segments and reset retry counter
+            current_segments = (current_segments / 2).clamp(1, current_segments - 1)
+            retries_at_current_segments = 0
+            warn "[parallel_sftp] Zip corruption persists, reducing to #{current_segments} segments..."
+          else
+            # segments = 1 and still failing, give up
+            raise e
+          end
+        end
+      end
+    end
+
+    def cleanup_corrupted_download(local_path)
+      FileUtils.rm_f(local_path)
+      FileUtils.rm_f("#{local_path}.lftp-pget-status")
+    end
+
+    def execute_download(remote_path, local_path, options)
       lftp_command = LftpCommand.new(
         host: host,
         user: user,

@@ -111,5 +111,101 @@ RSpec.describe ParallelSftp::Client do
 
       expect(result).to eq(local_path)
     end
+
+    context "with retry on corruption" do
+      let(:zip_error) { ParallelSftp::ZipIntegrityError.new(path: local_path, output: "corrupted") }
+
+      before do
+        allow(FileUtils).to receive(:rm_f)
+      end
+
+      it "retries with same segments on first corruption" do
+        call_count = 0
+        allow(ParallelSftp::Download).to receive(:new) do
+          download_mock = instance_double(ParallelSftp::Download)
+          allow(download_mock).to receive(:execute) do
+            call_count += 1
+            raise zip_error if call_count == 1
+
+            local_path
+          end
+          download_mock
+        end
+
+        result = client.download(remote_path, local_path, segments: 4)
+        expect(result).to eq(local_path)
+        expect(call_count).to eq(2)
+      end
+
+      it "cleans up corrupted files before retry" do
+        call_count = 0
+        allow(ParallelSftp::Download).to receive(:new) do
+          download_mock = instance_double(ParallelSftp::Download)
+          allow(download_mock).to receive(:execute) do
+            call_count += 1
+            raise zip_error if call_count == 1
+
+            local_path
+          end
+          download_mock
+        end
+
+        expect(FileUtils).to receive(:rm_f).with(local_path)
+        expect(FileUtils).to receive(:rm_f).with("#{local_path}.lftp-pget-status")
+
+        client.download(remote_path, local_path, segments: 4)
+      end
+
+      it "reduces segments after exhausting parallel retries" do
+        segments_used = []
+        call_count = 0
+
+        allow(ParallelSftp::LftpCommand).to receive(:new) do |opts|
+          segments_used << opts[:segments]
+          instance_double(ParallelSftp::LftpCommand)
+        end
+
+        allow(ParallelSftp::Download).to receive(:new) do
+          download_mock = instance_double(ParallelSftp::Download)
+          allow(download_mock).to receive(:execute) do
+            call_count += 1
+            # Fail first 2 attempts (parallel_retries default), succeed on 3rd with reduced segments
+            raise zip_error if call_count <= 2
+
+            local_path
+          end
+          download_mock
+        end
+
+        client.download(remote_path, local_path, segments: 4, parallel_retries: 2)
+
+        # First 2 with 4 segments, then 1 with 2 segments
+        expect(segments_used).to eq([4, 4, 2])
+      end
+
+      it "raises error after all retries exhausted with segments=1" do
+        allow(ParallelSftp::Download).to receive(:new) do
+          download_mock = instance_double(ParallelSftp::Download)
+          allow(download_mock).to receive(:execute).and_raise(zip_error)
+          download_mock
+        end
+
+        expect do
+          client.download(remote_path, local_path, segments: 2, parallel_retries: 1)
+        end.to raise_error(ParallelSftp::ZipIntegrityError)
+      end
+
+      it "skips retry logic when retry_on_corruption is false" do
+        download_mock = instance_double(ParallelSftp::Download)
+        allow(download_mock).to receive(:execute).and_raise(zip_error)
+        allow(ParallelSftp::Download).to receive(:new).and_return(download_mock)
+
+        expect(FileUtils).not_to receive(:rm_f)
+
+        expect do
+          client.download(remote_path, local_path, retry_on_corruption: false)
+        end.to raise_error(ParallelSftp::ZipIntegrityError)
+      end
+    end
   end
 end

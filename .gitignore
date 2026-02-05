@@ -14,5 +14,5 @@
 # Gem build artifacts
 *.gem
 
-# Bundler lockfile (optional - include if you want deterministic builds)
-# Gemfile.lock
+# Bundler lockfile (gems should test against fresh dependency resolution)
+Gemfile.lock

@@ -70,4 +70,29 @@ RSpec.describe "ParallelSftp errors" do
       expect(error.actual_size).to eq(500)
     end
   end
+
+  describe ParallelSftp::ZipIntegrityError do
+    it "is an IntegrityError" do
+      expect(described_class.new).to be_a(ParallelSftp::IntegrityError)
+    end
+
+    it "has a default message" do
+      error = described_class.new
+      expect(error.message).to include("Zip integrity check failed")
+    end
+
+    it "includes path when provided" do
+      error = described_class.new(path: "/tmp/file.zip")
+      expect(error.message).to include("/tmp/file.zip")
+    end
+
+    it "stores path and output" do
+      error = described_class.new(
+        path: "/tmp/file.zip",
+        output: "error: invalid compressed data"
+      )
+      expect(error.path).to eq("/tmp/file.zip")
+      expect(error.output).to eq("error: invalid compressed data")
+    end
+  end
 end
