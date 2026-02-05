@@ -30,7 +30,8 @@ module ParallelSftp
         "set net:max-retries #{max_retries}",
         "set net:reconnect-interval-base #{reconnect_interval}",
         "set sftp:auto-confirm yes",
-        "set ssl:verify-certificate no"
+        "set ssl:verify-certificate no",
+        "set xfer:clobber on"
       ]
 
       # Add custom SSH connect program if configured (for legacy host key algorithms)
