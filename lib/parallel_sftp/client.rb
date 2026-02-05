@@ -51,10 +51,14 @@ module ParallelSftp
     def download_with_retry(remote_path, local_path, options, segments, parallel_retries)
       current_segments = segments
       retries_at_current_segments = 0
+      first_attempt = true
 
       loop do
         begin
-          return execute_download(remote_path, local_path, options.merge(segments: current_segments, resume: false))
+          # First attempt: respect user's resume setting; retries: always fresh download
+          use_resume = first_attempt ? options.fetch(:resume, true) : false
+          first_attempt = false
+          return execute_download(remote_path, local_path, options.merge(segments: current_segments, resume: use_resume))
         rescue ZipIntegrityError => e
           cleanup_corrupted_download(local_path)
 
