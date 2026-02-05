@@ -7,6 +7,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.4.0] - 2026-02-05
+
+### Added
+- `verbose` option for debugging lftp output - prints command and lftp messages to stderr
+- `xfer:clobber on` setting to allow overwriting existing files
+
+### Fixed
+- Resume now works correctly on first download attempt (previously always disabled)
+- First attempt respects user's `resume` setting; only retries after corruption use fresh download
+
 ## [0.3.1] - 2026-02-05
 
 ### Added
