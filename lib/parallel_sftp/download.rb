@@ -11,10 +11,11 @@ module ParallelSftp
     # Default interval for polling the status file (in seconds)
     DEFAULT_POLL_INTERVAL = 1
 
-    def initialize(lftp_command, on_progress: nil, on_segment_progress: nil)
+    def initialize(lftp_command, on_progress: nil, on_segment_progress: nil, verbose: false)
       @lftp_command = lftp_command
       @on_progress = on_progress
       @on_segment_progress = on_segment_progress
+      @verbose = verbose
       @output_buffer = []
       @progress_parser = ProgressParser.new
       @segment_parser = SegmentProgressParser.new
@@ -41,6 +42,11 @@ module ParallelSftp
       exit_status = nil
       status_file = status_file_path
 
+      if @verbose
+        $stderr.puts "[lftp] Command: lftp -c '...'"
+        $stderr.puts "[lftp] Status file: #{status_file}"
+      end
+
       Open3.popen2e(*lftp_command.to_command) do |stdin, stdout_stderr, wait_thr|
         stdin.close
 
@@ -49,6 +55,7 @@ module ParallelSftp
 
         stdout_stderr.each_line do |line|
           @output_buffer << line
+          $stderr.puts "[lftp] #{line}" if @verbose
           process_output_line(line)
         end
 

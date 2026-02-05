@@ -121,7 +121,8 @@ module ParallelSftp
         reconnect_interval: options[:reconnect_interval],
         sftp_connect_program: options[:sftp_connect_program],
         on_progress: options[:on_progress],
-        on_segment_progress: options[:on_segment_progress]
+        on_segment_progress: options[:on_segment_progress],
+        verbose: options[:verbose]
       )
     end
   end

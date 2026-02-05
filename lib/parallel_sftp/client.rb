@@ -100,7 +100,8 @@ module ParallelSftp
       download = Download.new(
         lftp_command,
         on_progress: options[:on_progress],
-        on_segment_progress: options[:on_segment_progress]
+        on_segment_progress: options[:on_segment_progress],
+        verbose: options[:verbose]
       )
       download.execute
     end
