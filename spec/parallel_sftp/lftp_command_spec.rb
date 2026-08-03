@@ -217,6 +217,36 @@ RSpec.describe ParallelSftp::LftpCommand do
       end.to raise_error(ArgumentError, /sftp_connect_program/)
     end
 
+    it "rejects ProxyCommand in sftp_connect_program" do
+      expect do
+        described_class.new(options.merge(
+          sftp_connect_program: "ssh -o ProxyCommand=ncat,--exec,/bin/sh"
+        ))
+      end.to raise_error(ArgumentError, /sftp_connect_program/)
+    end
+
+    it "rejects LocalCommand in sftp_connect_program" do
+      expect do
+        described_class.new(options.merge(
+          sftp_connect_program: "ssh -o PermitLocalCommand=yes -o LocalCommand=id"
+        ))
+      end.to raise_error(ArgumentError, /sftp_connect_program/)
+    end
+
+    it "rejects KnownHostsCommand in sftp_connect_program" do
+      expect do
+        described_class.new(options.merge(
+          sftp_connect_program: "ssh -o KnownHostsCommand=/bin/true"
+        ))
+      end.to raise_error(ArgumentError, /sftp_connect_program/)
+    end
+
+    it "allows documented host-key algorithm connect-program" do
+      prog = "ssh -o HostKeyAlgorithms=+ssh-rsa -o PubkeyAcceptedKeyTypes=+ssh-rsa"
+      cmd = described_class.new(options.merge(sftp_connect_program: prog))
+      expect(cmd.to_script).to include(prog)
+    end
+
     it "URL-encodes special characters in user" do
       cmd = described_class.new(options.merge(user: "user+name"))
       expect(cmd.to_script).to include("sftp://user%2Bname:")

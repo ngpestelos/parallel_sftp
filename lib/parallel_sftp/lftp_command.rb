@@ -7,8 +7,21 @@ module ParallelSftp
     UNSAFE_PATH_CHARS = /["`\\\n\r\0]|!|\$\(|\$\{/
     # Host: hostname, IPv4, or bracketed IPv6
     HOST_PATTERN = /\A(?:[A-Za-z0-9](?:[A-Za-z0-9.-]*[A-Za-z0-9])?|\d{1,3}(?:\.\d{1,3}){3}|\[[0-9a-fA-F:.]+\])\z/
-    # connect-program: only `ssh` plus -o key=value style tokens (legacy host-key workarounds)
-    CONNECT_PROGRAM_PATTERN = /\Assh(?:\s+-o\s+[A-Za-z0-9_+=.,@%\/-]+)*\z/
+    # Positive allowlist of OpenSSH -o keys permitted in sftp_connect_program.
+    # Intentionally excludes command-running options (ProxyCommand, LocalCommand,
+    # RemoteCommand, KnownHostsCommand, PermitLocalCommand, etc.).
+    ALLOWED_CONNECT_PROGRAM_OPTIONS = %w[
+      HostKeyAlgorithms
+      PubkeyAcceptedKeyTypes
+      PubkeyAcceptedAlgorithms
+      StrictHostKeyChecking
+      UserKnownHostsFile
+      KexAlgorithms
+      Ciphers
+      MACs
+    ].freeze
+    # Safe value charset for allowlisted -o options (no spaces/quotes/shell meta).
+    CONNECT_PROGRAM_OPTION_VALUE = /\A[A-Za-z0-9_+=.,@%\/-]+\z/
 
     attr_reader :host, :user, :password, :port, :remote_path, :local_path,
                 :segments, :timeout, :max_retries, :reconnect_interval, :resume,
@@ -101,12 +114,46 @@ module ParallelSftp
 
     def validate_connect_program!
       return if sftp_connect_program.nil?
-      prog = sftp_connect_program.to_s
-      return if prog.match?(CONNECT_PROGRAM_PATTERN)
 
-      raise ArgumentError,
-        "sftp_connect_program must be an allowlisted ssh -o ... form " \
-        "(no quotes, shell metacharacters, or non-ssh binaries)"
+      tokens = sftp_connect_program.to_s.split(/\s+/)
+      unless tokens.first == "ssh"
+        raise ArgumentError,
+          "sftp_connect_program must be an allowlisted ssh -o ... form " \
+          "(binary must be ssh; no quotes or shell metacharacters)"
+      end
+
+      i = 1
+      while i < tokens.length
+        unless tokens[i] == "-o"
+          raise ArgumentError,
+            "sftp_connect_program only allows -o key=value after ssh " \
+            "(got #{tokens[i].inspect})"
+        end
+        i += 1
+        if i >= tokens.length
+          raise ArgumentError, "sftp_connect_program: -o requires key=value"
+        end
+
+        key, sep, value = tokens[i].partition("=")
+        unless sep == "=" && !key.empty? && !value.empty?
+          raise ArgumentError,
+            "sftp_connect_program: -o requires key=value (got #{tokens[i].inspect})"
+        end
+        unless allowlisted_connect_option?(key)
+          raise ArgumentError,
+            "sftp_connect_program: ssh -o option #{key.inspect} is not allowlisted " \
+            "(allowed: #{ALLOWED_CONNECT_PROGRAM_OPTIONS.join(', ')})"
+        end
+        unless value.match?(CONNECT_PROGRAM_OPTION_VALUE)
+          raise ArgumentError,
+            "sftp_connect_program: invalid characters in option value for #{key}"
+        end
+        i += 1
+      end
+    end
+
+    def allowlisted_connect_option?(key)
+      ALLOWED_CONNECT_PROGRAM_OPTIONS.any? { |allowed| allowed.casecmp?(key) }
     end
 
     def escaped_user
