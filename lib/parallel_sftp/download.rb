@@ -43,23 +43,27 @@ module ParallelSftp
       status_file = status_file_path
 
       if @verbose
-        $stderr.puts "[lftp] Command: lftp -c '...'"
+        $stderr.puts "[lftp] Command: lftp -f <temp-script>"
         $stderr.puts "[lftp] Status file: #{status_file}"
       end
 
-      Open3.popen2e(*lftp_command.to_command) do |stdin, stdout_stderr, wait_thr|
-        stdin.close
+      # Script (including password) goes in a 0600 tempfile, not process argv.
+      # See LftpCommand#with_script_file residual-risk note (same-UID readers).
+      lftp_command.with_script_file do |script_path|
+        Open3.popen2e(*lftp_command.to_argv(script_path)) do |stdin, stdout_stderr, wait_thr|
+          stdin.close
 
-        # Start background polling for segment progress
-        start_segment_polling(status_file) if on_segment_progress
+          # Start background polling for segment progress
+          start_segment_polling(status_file) if on_segment_progress
 
-        stdout_stderr.each_line do |line|
-          @output_buffer << line
-          $stderr.puts "[lftp] #{line}" if @verbose
-          process_output_line(line)
+          stdout_stderr.each_line do |line|
+            @output_buffer << line
+            $stderr.puts "[lftp] #{line}" if @verbose
+            process_output_line(line)
+          end
+
+          exit_status = wait_thr.value
         end
-
-        exit_status = wait_thr.value
       end
 
       stop_segment_polling

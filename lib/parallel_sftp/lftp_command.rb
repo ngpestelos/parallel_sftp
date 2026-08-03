@@ -1,5 +1,7 @@
 # frozen_string_literal: true
 
+require "tempfile"
+
 module ParallelSftp
   # Builds lftp command scripts for SFTP downloads
   class LftpCommand
@@ -68,9 +70,40 @@ module ParallelSftp
       lines.join("\n") + "\n"
     end
 
-    # Generate the full lftp command with script
+    # argv for Open3 — must NOT include the script (and thus password) on the process list.
+    # Prefer #with_script_file + these args; #to_command is deprecated for live runs.
+    def to_argv(script_path)
+      ["lftp", "-f", script_path]
+    end
+
+    # @deprecated Prefer {#with_script_file} + {#to_argv} so credentials are not on argv.
+    # Kept for callers/tests that only inspect the historical interface.
     def to_command
       ["lftp", "-c", to_script]
+    end
+
+    # Write the lftp script to a mode-0600 tempfile, yield its path, then unlink.
+    # Residual risk: same-UID processes can read the file while it exists.
+    def with_script_file
+      file = Tempfile.new(["parallel_sftp_", ".lftp"])
+      begin
+        file.chmod(0o600)
+        file.write(to_script)
+        file.flush
+        file.close
+        yield file.path
+      ensure
+        begin
+          file.close unless file.closed?
+        rescue StandardError
+          nil
+        end
+        begin
+          file.unlink
+        rescue StandardError
+          nil
+        end
+      end
     end
 
     private

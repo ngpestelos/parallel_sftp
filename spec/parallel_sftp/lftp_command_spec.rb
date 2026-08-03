@@ -149,13 +149,52 @@ RSpec.describe ParallelSftp::LftpCommand do
   end
 
   describe "#to_command" do
-    it "returns an array for Open3" do
+    it "returns a legacy array for Open3 (password still on argv — prefer with_script_file)" do
       cmd = command.to_command
 
       expect(cmd).to be_an(Array)
       expect(cmd.first).to eq("lftp")
       expect(cmd[1]).to eq("-c")
       expect(cmd[2]).to be_a(String)
+    end
+  end
+
+  describe "#to_argv" do
+    it "uses -f with a script path and never embeds the password" do
+      argv = command.to_argv("/tmp/script.lftp")
+      expect(argv).to eq(["lftp", "-f", "/tmp/script.lftp"])
+      expect(argv.join(" ")).not_to include("secret123")
+    end
+  end
+
+  describe "#with_script_file" do
+    it "writes a 0600 script, yields the path, and unlinks afterward" do
+      path_seen = nil
+      mode_seen = nil
+      content_seen = nil
+
+      command.with_script_file do |path|
+        path_seen = path
+        expect(File.exist?(path)).to be(true)
+        mode_seen = File.stat(path).mode & 0o777
+        content_seen = File.read(path)
+      end
+
+      expect(mode_seen).to eq(0o600)
+      expect(content_seen).to include("open -p")
+      expect(content_seen).to include("secret123")
+      expect(File.exist?(path_seen)).to be(false)
+    end
+
+    it "unlinks the tempfile even when the block raises" do
+      path_seen = nil
+      expect do
+        command.with_script_file do |path|
+          path_seen = path
+          raise "boom"
+        end
+      end.to raise_error("boom")
+      expect(File.exist?(path_seen)).to be(false)
     end
   end
 
