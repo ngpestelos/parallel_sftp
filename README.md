@@ -113,6 +113,8 @@ ParallelSftp.configure do |config|
 end
 ```
 
+Path strings and `sftp_connect_program` are validated for safe embedding in the lftp script (and connect-program options are positive-allowlisted to `ssh -o` keys such as HostKeyAlgorithms). This is **not** a full path sandbox: callers must still treat remote/local paths as trusted application inputs.
+
 ### Large File Optimization
 
 For files 20GB+, use the optimized settings:

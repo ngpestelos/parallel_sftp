@@ -53,7 +53,7 @@ RSpec.describe ParallelSftp::Client do
       ).and_call_original
 
       expect(ParallelSftp::Download).to receive(:new)
-        .with(anything, on_progress: nil, on_segment_progress: nil)
+        .with(anything, hash_including(on_progress: nil, on_segment_progress: nil))
         .and_return(download_mock)
 
       client.download(remote_path, local_path)
@@ -86,7 +86,7 @@ RSpec.describe ParallelSftp::Client do
       progress_callback = ->(info) { puts info }
 
       expect(ParallelSftp::Download).to receive(:new)
-        .with(anything, on_progress: progress_callback, on_segment_progress: nil)
+        .with(anything, hash_including(on_progress: progress_callback, on_segment_progress: nil))
         .and_return(download_mock)
 
       client.download(remote_path, local_path, on_progress: progress_callback)
@@ -97,7 +97,7 @@ RSpec.describe ParallelSftp::Client do
       segment_callback = ->(info) { puts info[:segments] }
 
       expect(ParallelSftp::Download).to receive(:new)
-        .with(anything, on_progress: nil, on_segment_progress: segment_callback)
+        .with(anything, hash_including(on_progress: nil, on_segment_progress: segment_callback))
         .and_return(download_mock)
 
       client.download(remote_path, local_path, on_segment_progress: segment_callback)
