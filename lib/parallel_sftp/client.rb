@@ -5,7 +5,8 @@ require "fileutils"
 module ParallelSftp
   # SFTP client for parallel downloads
   class Client
-    attr_reader :host, :user, :password, :port
+    # password is intentionally not a public attr_reader (issue #8).
+    attr_reader :host, :user, :port
 
     # Default number of times to retry with same segment count before reducing
     DEFAULT_PARALLEL_RETRIES = 2
@@ -89,7 +90,7 @@ module ParallelSftp
       lftp_command = LftpCommand.new(
         host: host,
         user: user,
-        password: password,
+        password: @password,
         port: port,
         remote_path: remote_path,
         local_path: local_path,

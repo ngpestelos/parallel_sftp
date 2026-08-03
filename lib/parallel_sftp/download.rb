@@ -140,7 +140,7 @@ module ParallelSftp
           "lftp exited with status #{exit_status.exitstatus}",
           remote_path: lftp_command.remote_path,
           exit_status: exit_status.exitstatus,
-          output: @output_buffer.join
+          output: redact_secrets(@output_buffer.join)
         )
       end
     end
@@ -150,7 +150,7 @@ module ParallelSftp
         raise DownloadError.new(
           "Downloaded file not found at expected location",
           remote_path: lftp_command.remote_path,
-          output: @output_buffer.join
+          output: redact_secrets(@output_buffer.join)
         )
       end
 
@@ -167,9 +167,20 @@ module ParallelSftp
         raise ZipIntegrityError.new(
           "Zip file corrupted (possible segment boundary issue)",
           path: path,
-          output: error_lines
+          output: redact_secrets(error_lines)
         )
       end
     end
+
+    # Strip sftp/ftp URL userinfo (user:password@) from process output before
+    # attaching it to exceptions that callers may log.
+    def redact_secrets(text)
+      return text if text.nil? || text.empty?
+
+      text
+        .gsub(%r{((?:s?ftp|https?)://)([^/\s:@]+):([^@/\s]+)@}i, '\1\2:***@')
+        .gsub(/(password[=:]\s*)\S+/i, '\1***')
+    end
   end
 end
+

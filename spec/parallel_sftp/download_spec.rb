@@ -167,6 +167,26 @@ RSpec.describe ParallelSftp::Download do
     end
   end
 
+  describe "secret redaction on errors" do
+    let(:wait_thr) { instance_double(Process::Waiter, value: double(success?: false, exitstatus: 1)) }
+
+    before do
+      allow(Open3).to receive(:popen2e).and_yield(
+        instance_double(IO, close: nil),
+        StringIO.new("Login failed for sftp://user:supersecret@host/path\npassword: supersecret\n"),
+        wait_thr
+      )
+    end
+
+    it "redacts URL userinfo and password= values from DownloadError#output" do
+      expect { download.execute }.to raise_error(ParallelSftp::DownloadError) do |error|
+        expect(error.output).to include("sftp://user:***@host/path")
+        expect(error.output).not_to include("supersecret")
+        expect(error.output).to match(/password[=:]\s*\*\*\*/i)
+      end
+    end
+  end
+
   describe "progress callback" do
     let(:wait_thr) { instance_double(Process::Waiter, value: double(success?: true, exitstatus: 0)) }
     let(:progress_updates) { [] }

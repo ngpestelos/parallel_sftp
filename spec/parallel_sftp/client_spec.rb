@@ -14,10 +14,10 @@ RSpec.describe ParallelSftp::Client do
   subject(:client) { described_class.new(client_options) }
 
   describe "#initialize" do
-    it "stores connection details" do
+    it "stores connection details without exposing password" do
       expect(client.host).to eq("sftp.example.com")
       expect(client.user).to eq("testuser")
-      expect(client.password).to eq("secret123")
+      expect(client).not_to respond_to(:password)
     end
 
     it "uses default port" do
