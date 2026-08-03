@@ -3,6 +3,13 @@
 module ParallelSftp
   # Builds lftp command scripts for SFTP downloads
   class LftpCommand
+    # Characters that can break out of double-quoted lftp script interpolation.
+    UNSAFE_PATH_CHARS = /["`\\\n\r\0]|!|\$\(|\$\{/
+    # Host: hostname, IPv4, or bracketed IPv6
+    HOST_PATTERN = /\A(?:[A-Za-z0-9](?:[A-Za-z0-9.-]*[A-Za-z0-9])?|\d{1,3}(?:\.\d{1,3}){3}|\[[0-9a-fA-F:.]+\])\z/
+    # connect-program: only `ssh` plus -o key=value style tokens (legacy host-key workarounds)
+    CONNECT_PROGRAM_PATTERN = /\Assh(?:\s+-o\s+[A-Za-z0-9_+=.,@%\/-]+)*\z/
+
     attr_reader :host, :user, :password, :port, :remote_path, :local_path,
                 :segments, :timeout, :max_retries, :reconnect_interval, :resume,
                 :sftp_connect_program
@@ -11,16 +18,18 @@ module ParallelSftp
       @host = options.fetch(:host)
       @user = options.fetch(:user)
       @password = options.fetch(:password)
-      @port = options.fetch(:port, ParallelSftp.configuration.default_port)
+      @port = Integer(options.fetch(:port, ParallelSftp.configuration.default_port))
       @remote_path = options.fetch(:remote_path)
       @local_path = options.fetch(:local_path)
-      @segments = options.fetch(:segments, ParallelSftp.configuration.default_segments)
-      @timeout = options.fetch(:timeout, ParallelSftp.configuration.timeout)
-      @max_retries = options.fetch(:max_retries, ParallelSftp.configuration.max_retries)
-      @reconnect_interval = options.fetch(:reconnect_interval, ParallelSftp.configuration.reconnect_interval)
+      @segments = Integer(options.fetch(:segments, ParallelSftp.configuration.default_segments))
+      @timeout = Integer(options.fetch(:timeout, ParallelSftp.configuration.timeout))
+      @max_retries = Integer(options.fetch(:max_retries, ParallelSftp.configuration.max_retries))
+      @reconnect_interval = Integer(options.fetch(:reconnect_interval, ParallelSftp.configuration.reconnect_interval))
       @resume = options.fetch(:resume, true)
       @sftp_connect_program = options.fetch(:sftp_connect_program,
         ParallelSftp.configuration.sftp_connect_program)
+
+      validate!
     end
 
     # Generate the lftp script for download
@@ -39,7 +48,7 @@ module ParallelSftp
         lines << "set sftp:connect-program \"#{sftp_connect_program}\""
       end
 
-      lines << "open -p #{port} sftp://#{user}:#{escaped_password}@#{host}"
+      lines << "open -p #{port} sftp://#{escaped_user}:#{escaped_password}@#{host}"
       lines << "pget -n #{segments}#{resume_flag} \"#{remote_path}\" -o \"#{local_path}\""
       lines << "quit"
 
@@ -53,9 +62,61 @@ module ParallelSftp
 
     private
 
+    def validate!
+      validate_host!
+      validate_user!
+      validate_path!(remote_path, :remote_path)
+      validate_path!(local_path, :local_path)
+      validate_connect_program!
+      raise ArgumentError, "port must be between 1 and 65535" unless port.between?(1, 65_535)
+      raise ArgumentError, "segments must be >= 1" unless segments >= 1
+      raise ArgumentError, "timeout must be >= 0" unless timeout >= 0
+      raise ArgumentError, "max_retries must be >= 0" unless max_retries >= 0
+      raise ArgumentError, "reconnect_interval must be >= 0" unless reconnect_interval >= 0
+    end
+
+    def validate_host!
+      host_s = host.to_s
+      raise ArgumentError, "host is required" if host_s.empty?
+      return if host_s.match?(HOST_PATTERN)
+
+      raise ArgumentError, "host has invalid format (hostname, IPv4, or [IPv6] only)"
+    end
+
+    def validate_user!
+      user_s = user.to_s
+      raise ArgumentError, "user is required" if user_s.empty?
+      raise ArgumentError, "user contains disallowed characters" if user_s.match?(/[\n\r\0@\/]/)
+    end
+
+    def validate_path!(path, name)
+      path_s = path.to_s
+      raise ArgumentError, "#{name} is required" if path_s.empty?
+      if path_s.match?(UNSAFE_PATH_CHARS)
+        raise ArgumentError,
+          "#{name} contains characters that cannot be safely embedded in an lftp script " \
+          "(quotes, backslash, newlines, !, or shell expansions)"
+      end
+    end
+
+    def validate_connect_program!
+      return if sftp_connect_program.nil?
+      prog = sftp_connect_program.to_s
+      return if prog.match?(CONNECT_PROGRAM_PATTERN)
+
+      raise ArgumentError,
+        "sftp_connect_program must be an allowlisted ssh -o ... form " \
+        "(no quotes, shell metacharacters, or non-ssh binaries)"
+    end
+
+    def escaped_user
+      # URL-encode user for sftp://user:pass@host (password already encoded)
+      user.to_s.gsub(/[^a-zA-Z0-9_.~-]/) { |c| format("%%%02X", c.ord) }
+    end
+
     def escaped_password
       # Escape special characters in password for URL
-      password.gsub(/[^a-zA-Z0-9_.-]/) { |c| format("%%%02X", c.ord) }
+      password.to_s.gsub(/[^a-zA-Z0-9_.-]/) { |c| format("%%%02X", c.ord) }
     end
 
     def resume_flag

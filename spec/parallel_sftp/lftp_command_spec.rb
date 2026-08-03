@@ -183,4 +183,56 @@ RSpec.describe ParallelSftp::LftpCommand do
       end
     end
   end
+
+  describe "injection hardening" do
+    it "rejects remote_path that breaks out of double quotes" do
+      expect do
+        described_class.new(options.merge(remote_path: %q{/a"; !echo pwned; "}))
+      end.to raise_error(ArgumentError, /remote_path/)
+    end
+
+    it "rejects local_path with backticks" do
+      expect do
+        described_class.new(options.merge(local_path: "/tmp/`id`"))
+      end.to raise_error(ArgumentError, /local_path/)
+    end
+
+    it "allows spaces in paths" do
+      cmd = described_class.new(options.merge(
+        remote_path: "/data/my file.zip",
+        local_path: "/tmp/my file.zip"
+      ))
+      expect(cmd.to_script).to include('"/data/my file.zip"')
+    end
+
+    it "rejects sftp_connect_program quote breakout" do
+      expect do
+        described_class.new(options.merge(sftp_connect_program: %q{ssh -o "foo; touch /tmp/pwned}))
+      end.to raise_error(ArgumentError, /sftp_connect_program/)
+    end
+
+    it "rejects non-ssh connect programs" do
+      expect do
+        described_class.new(options.merge(sftp_connect_program: "bash -c evil"))
+      end.to raise_error(ArgumentError, /sftp_connect_program/)
+    end
+
+    it "URL-encodes special characters in user" do
+      cmd = described_class.new(options.merge(user: "user+name"))
+      expect(cmd.to_script).to include("sftp://user%2Bname:")
+    end
+
+    it "rejects invalid host" do
+      expect do
+        described_class.new(options.merge(host: "evil host;pwn"))
+      end.to raise_error(ArgumentError, /host/)
+    end
+
+    it "rejects non-integer-looking segments via Integer()" do
+      expect do
+        described_class.new(options.merge(segments: "4; !x"))
+      end.to raise_error(ArgumentError)
+    end
+  end
 end
+
