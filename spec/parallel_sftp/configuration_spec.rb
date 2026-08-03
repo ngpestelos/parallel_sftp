@@ -29,6 +29,10 @@ RSpec.describe ParallelSftp::Configuration do
     it "has sftp_connect_program of nil" do
       expect(config.sftp_connect_program).to be_nil
     end
+
+    it "has insecure false (secure TLS/host-key defaults)" do
+      expect(config.insecure).to be(false)
+    end
   end
 
   describe "attribute accessors" do

@@ -21,6 +21,11 @@ module ParallelSftp
     # Example: "ssh -o HostKeyAlgorithms=+ssh-rsa -o PubkeyAcceptedKeyTypes=+ssh-rsa"
     attr_accessor :sftp_connect_program
 
+    # When true, restores pre-0.5 insecure lftp defaults:
+    # `ssl:verify-certificate no` and `sftp:auto-confirm yes`.
+    # Prefer leaving this false and fixing host keys / CA trust instead.
+    attr_accessor :insecure
+
     def initialize
       @default_segments = 4
       @timeout = 30
@@ -28,6 +33,7 @@ module ParallelSftp
       @reconnect_interval = 5
       @default_port = 22
       @sftp_connect_program = nil
+      @insecure = false
     end
 
     # Apply large file optimizations (20GB+)

@@ -98,7 +98,8 @@ module ParallelSftp
         timeout: options.fetch(:timeout, ParallelSftp.configuration.timeout),
         max_retries: options.fetch(:max_retries, ParallelSftp.configuration.max_retries),
         reconnect_interval: options.fetch(:reconnect_interval, ParallelSftp.configuration.reconnect_interval),
-        sftp_connect_program: options[:sftp_connect_program]
+        sftp_connect_program: options[:sftp_connect_program],
+        insecure: options.fetch(:insecure, ParallelSftp.configuration.insecure)
       )
 
       download = Download.new(
