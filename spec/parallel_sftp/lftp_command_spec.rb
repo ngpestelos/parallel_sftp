@@ -17,11 +17,15 @@ RSpec.describe ParallelSftp::LftpCommand do
   subject(:command) { described_class.new(options) }
 
   describe "#initialize" do
-    it "stores connection details" do
+    it "stores connection details without exposing password" do
       expect(command.host).to eq("sftp.example.com")
       expect(command.user).to eq("testuser")
-      expect(command.password).to eq("secret123")
+      expect(command).not_to respond_to(:password)
       expect(command.port).to eq(22)
+    end
+
+    it "inspect does not include password" do
+      expect(command.inspect).not_to include("secret123")
     end
 
     it "stores file paths" do

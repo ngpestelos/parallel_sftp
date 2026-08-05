@@ -25,7 +25,8 @@ module ParallelSftp
     # Safe value charset for allowlisted -o options (no spaces/quotes/shell meta).
     CONNECT_PROGRAM_OPTION_VALUE = /\A[A-Za-z0-9_+=.,@%\/-]+\z/
 
-    attr_reader :host, :user, :password, :port, :remote_path, :local_path,
+    # password is intentionally not a public attr_reader (issue #8).
+    attr_reader :host, :user, :port, :remote_path, :local_path,
                 :segments, :timeout, :max_retries, :reconnect_interval, :resume,
                 :sftp_connect_program, :insecure
 
@@ -44,6 +45,11 @@ module ParallelSftp
       @sftp_connect_program = options.fetch(:sftp_connect_program, ParallelSftp.configuration.sftp_connect_program)
       @insecure = options.fetch(:insecure, ParallelSftp.configuration.insecure)
       validate!
+    end
+
+    # Omit @password from default dumps (issue #8).
+    def inspect
+      "#<#{self.class.name}:0x#{format('%x', object_id)} @host=#{host.inspect} @user=#{user.inspect} @port=#{port.inspect}>"
     end
 
     # Generate the lftp script for the download
@@ -203,7 +209,7 @@ module ParallelSftp
 
     def escaped_password
       # Escape special characters in password for URL
-      password.to_s.gsub(/[^a-zA-Z0-9_.-]/) { |c| format("%%%02X", c.ord) }
+      @password.to_s.gsub(/[^a-zA-Z0-9_.-]/) { |c| format("%%%02X", c.ord) }
     end
 
     def resume_flag

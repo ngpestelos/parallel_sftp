@@ -39,38 +39,39 @@ module ParallelSftp
     private
 
     def run_lftp
-      exit_status = nil
-      status_file = status_file_path
+    exit_status = nil
+    status_file = status_file_path
 
-      if @verbose
-        $stderr.puts "[lftp] Command: lftp -f <temp-script>"
-        $stderr.puts "[lftp] Status file: #{status_file}"
-      end
-
-      # Script (including password) goes in a 0600 tempfile, not process argv.
-      # See LftpCommand#with_script_file residual-risk note (same-UID readers).
-      lftp_command.with_script_file do |script_path|
-        Open3.popen2e(*lftp_command.to_argv(script_path)) do |stdin, stdout_stderr, wait_thr|
-          stdin.close
-
-          # Start background polling for segment progress
-          start_segment_polling(status_file) if on_segment_progress
-
-          stdout_stderr.each_line do |line|
-            @output_buffer << line
-            $stderr.puts "[lftp] #{line}" if @verbose
-            process_output_line(line)
-          end
-
-          exit_status = wait_thr.value
-        end
-      end
-
-      stop_segment_polling
-      handle_result(exit_status)
+    if @verbose
+      $stderr.puts "[lftp] Command: lftp -f <temp-script>"
+      $stderr.puts "[lftp] Status file: #{status_file}"
     end
 
-    def status_file_path
+    # Script (including password) goes in a 0600 tempfile, not process argv.
+    # See LftpCommand#with_script_file residual-risk note (same-UID readers).
+    lftp_command.with_script_file do |script_path|
+      Open3.popen2e(*lftp_command.to_argv(script_path)) do |stdin, stdout_stderr, wait_thr|
+        stdin.close
+
+        # Start background polling for segment progress
+        start_segment_polling(status_file) if on_segment_progress
+
+        stdout_stderr.each_line do |line|
+          safe = redact_secrets(line)
+          @output_buffer << safe
+          $stderr.puts "[lftp] #{safe}" if @verbose
+          process_output_line(line)
+        end
+
+        exit_status = wait_thr.value
+      end
+    end
+
+    stop_segment_polling
+    handle_result(exit_status)
+  end
+
+  def status_file_path
       "#{lftp_command.local_path}.lftp-pget-status"
     end
 
@@ -140,7 +141,7 @@ module ParallelSftp
           "lftp exited with status #{exit_status.exitstatus}",
           remote_path: lftp_command.remote_path,
           exit_status: exit_status.exitstatus,
-          output: @output_buffer.join
+          output: redact_secrets(@output_buffer.join)
         )
       end
     end
@@ -150,7 +151,7 @@ module ParallelSftp
         raise DownloadError.new(
           "Downloaded file not found at expected location",
           remote_path: lftp_command.remote_path,
-          output: @output_buffer.join
+          output: redact_secrets(@output_buffer.join)
         )
       end
 
@@ -167,9 +168,20 @@ module ParallelSftp
         raise ZipIntegrityError.new(
           "Zip file corrupted (possible segment boundary issue)",
           path: path,
-          output: error_lines
+          output: redact_secrets(error_lines)
         )
       end
     end
+
+    # Strip sftp/ftp URL userinfo (user:password@) from process output before
+    # attaching it to exceptions that callers may log.
+    def redact_secrets(text)
+      return text if text.nil? || text.empty?
+
+      text
+        .gsub(%r{((?:s?ftp|https?)://)([^/\s:@]+):([^@/\s]+)@}i, '\1\2:***@')
+        .gsub(/(password[=:]\s*)\S+/i, '\1***')
+    end
   end
 end
+
