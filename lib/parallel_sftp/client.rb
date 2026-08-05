@@ -18,6 +18,11 @@ module ParallelSftp
       @port = options.fetch(:port, ParallelSftp.configuration.default_port)
     end
 
+    # Omit @password from default dumps (issue #8 / accidental log/serialize).
+    def inspect
+      "#<#{self.class.name}:0x#{format('%x', object_id)} @host=#{host.inspect} @user=#{user.inspect} @port=#{port.inspect}>"
+    end
+
     # Download a file from the remote server
     #
     # @param remote_path [String] Path to the file on the remote server
