@@ -33,6 +33,11 @@ RSpec.describe ParallelSftp::Configuration do
     it "has insecure false (secure TLS/host-key defaults)" do
       expect(config.insecure).to be(false)
     end
+
+    it "can set insecure true" do
+      config.insecure = true
+      expect(config.insecure).to be(true)
+    end
   end
 
   describe "attribute accessors" do
