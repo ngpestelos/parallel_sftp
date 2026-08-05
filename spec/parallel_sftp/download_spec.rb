@@ -7,7 +7,7 @@ RSpec.describe ParallelSftp::Download do
   let(:lftp_command) do
     instance_double(
       ParallelSftp::LftpCommand,
-      to_command: ["lftp", "-c", "script"],
+      to_argv: ["lftp", "-f", "/tmp/fake.lftp"],
       local_path: "/tmp/test_file.zip",
       remote_path: "/remote/file.zip"
     )
@@ -18,6 +18,7 @@ RSpec.describe ParallelSftp::Download do
   before do
     allow(ParallelSftp).to receive(:lftp_available?).and_return(true)
     allow(FileUtils).to receive(:mkdir_p)
+    allow(lftp_command).to receive(:with_script_file).and_yield("/tmp/fake.lftp")
   end
 
   describe "#execute" do
@@ -142,7 +143,7 @@ RSpec.describe ParallelSftp::Download do
       let(:lftp_command) do
         instance_double(
           ParallelSftp::LftpCommand,
-          to_command: ["lftp", "-c", "script"],
+          to_argv: ["lftp", "-f", "/tmp/fake.lftp"],
           local_path: "/tmp/test_file.txt",
           remote_path: "/remote/file.txt"
         )
@@ -150,6 +151,7 @@ RSpec.describe ParallelSftp::Download do
       let(:wait_thr) { instance_double(Process::Waiter, value: double(success?: true, exitstatus: 0)) }
 
       before do
+        allow(lftp_command).to receive(:with_script_file).and_yield("/tmp/fake.lftp")
         allow(Open3).to receive(:popen2e).and_yield(
           instance_double(IO, close: nil),
           StringIO.new("Done\n"),

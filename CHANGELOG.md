@@ -9,6 +9,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Security
 - Validate host, user, paths, numeric options, and `sftp_connect_program` before building lftp scripts to prevent script injection (issue #6). Paths with spaces remain allowed; quotes/newlines/`!`/shell expansions are rejected. Username is URL-encoded on the `open` URL. `sftp_connect_program` is restricted to `ssh` plus a positive allowlist of `-o` keys (e.g. HostKeyAlgorithms); options that run local commands (ProxyCommand, LocalCommand, KnownHostsCommand, …) are rejected.
+- Live downloads no longer put the SFTP password on the `lftp` process argv (`ps` / `/proc/*/cmdline`). The script is written to a mode-0600 tempfile and run with `lftp -f` (issue #5). Residual risk: same-UID readers can still open the tempfile while the transfer runs.
 
 ## [0.4.0] - 2026-02-05
 
