@@ -39,46 +39,39 @@ module ParallelSftp
     private
 
     def run_lftp
-      exit_status = nil
-      status_file = status_file_path
+    exit_status = nil
+    status_file = status_file_path
 
-      if @verbose
-        $stderr.puts "[lftp] Command: lftp -f <temp-script>"
-        $stderr.puts "[lftp] Status file: #{status_file}"
-      end
+    if @verbose
+      $stderr.puts "[lftp] Command: lftp -f <temp-script>"
+      $stderr.puts "[lftp] Status file: #{status_file}"
+    end
 
-      # Script (including password) goes in a 0600 tempfile, not process argv.
-      # See LftpCommand#with_script_file residual-risk note (same-UID readers).
-      lftp_command.with_script_file do |script_path|
-        Open3.popen2e(*lftp_command.to_argv(script_path)) do |stdin, stdout_stderr, wait_thr|
-          stdin.close
+    # Script (including password) goes in a 0600 tempfile, not process argv.
+    # See LftpCommand#with_script_file residual-risk note (same-UID readers).
+    lftp_command.with_script_file do |script_path|
+      Open3.popen2e(*lftp_command.to_argv(script_path)) do |stdin, stdout_stderr, wait_thr|
+        stdin.close
 
-          # Start background polling for segment progress
-          start_segment_polling(status_file) if on_segment_progress
+        # Start background polling for segment progress
+        start_segment_polling(status_file) if on_segment_progress
 
-<<<<<<< HEAD
-          stdout_stderr.each_line do |line|
-            @output_buffer << line
-            $stderr.puts "[lftp] #{line}" if @verbose
-            process_output_line(line)
-          end
-
-          exit_status = wait_thr.value
-=======
         stdout_stderr.each_line do |line|
           safe = redact_secrets(line)
           @output_buffer << safe
           $stderr.puts "[lftp] #{safe}" if @verbose
           process_output_line(line)
->>>>>>> 1383ed0 (security: redact verbose stderr and omit password from inspect)
         end
-      end
 
-      stop_segment_polling
-      handle_result(exit_status)
+        exit_status = wait_thr.value
+      end
     end
 
-    def status_file_path
+    stop_segment_polling
+    handle_result(exit_status)
+  end
+
+  def status_file_path
       "#{lftp_command.local_path}.lftp-pget-status"
     end
 
