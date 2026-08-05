@@ -5,7 +5,7 @@ require "tempfile"
 module ParallelSftp
   # Builds lftp command scripts for SFTP downloads
   class LftpCommand
-    # Characters that can break out of double-quoted lftp script interpolation.
+    # Characters that break out of double-quoted lftp script interpolation.
     UNSAFE_PATH_CHARS = /["`\\\n\r\0]|!|\$\(|\$\{/
     # Host: hostname, IPv4, or bracketed IPv6
     HOST_PATTERN = /\A(?:[A-Za-z0-9](?:[A-Za-z0-9.-]*[A-Za-z0-9])?|\d{1,3}(?:\.\d{1,3}){3}|\[[0-9a-fA-F:.]+\])\z/
@@ -27,7 +27,7 @@ module ParallelSftp
 
     attr_reader :host, :user, :password, :port, :remote_path, :local_path,
                 :segments, :timeout, :max_retries, :reconnect_interval, :resume,
-                :sftp_connect_program
+                :sftp_connect_program, :insecure
 
     def initialize(options = {})
       @host = options.fetch(:host)
@@ -41,20 +41,18 @@ module ParallelSftp
       @max_retries = Integer(options.fetch(:max_retries, ParallelSftp.configuration.max_retries))
       @reconnect_interval = Integer(options.fetch(:reconnect_interval, ParallelSftp.configuration.reconnect_interval))
       @resume = options.fetch(:resume, true)
-      @sftp_connect_program = options.fetch(:sftp_connect_program,
-        ParallelSftp.configuration.sftp_connect_program)
-
+      @sftp_connect_program = options.fetch(:sftp_connect_program, ParallelSftp.configuration.sftp_connect_program)
+      @insecure = options.fetch(:insecure, ParallelSftp.configuration.insecure)
       validate!
     end
 
-    # Generate the lftp script for download
+    # Generate the lftp script for the download
     def to_script
       lines = [
         "set net:timeout #{timeout}",
         "set net:max-retries #{max_retries}",
         "set net:reconnect-interval-base #{reconnect_interval}",
-        "set sftp:auto-confirm yes",
-        "set ssl:verify-certificate no",
+        *tls_and_host_key_settings,
         "set xfer:clobber on"
       ]
 
@@ -126,7 +124,7 @@ module ParallelSftp
       raise ArgumentError, "host is required" if host_s.empty?
       return if host_s.match?(HOST_PATTERN)
 
-      raise ArgumentError, "host has invalid format (hostname, IPv4, or [IPv6] only)"
+      raise ArgumentError, "host must be a hostname, IPv4, or [IPv6] only"
     end
 
     def validate_user!
@@ -138,11 +136,10 @@ module ParallelSftp
     def validate_path!(path, name)
       path_s = path.to_s
       raise ArgumentError, "#{name} is required" if path_s.empty?
-      if path_s.match?(UNSAFE_PATH_CHARS)
-        raise ArgumentError,
-          "#{name} contains characters that cannot be safely embedded in an lftp script " \
-          "(quotes, backslash, newlines, !, or shell expansions)"
-      end
+      return unless path_s.match?(UNSAFE_PATH_CHARS)
+
+      raise ArgumentError, "#{name} contains characters that cannot be safely embedded in an lftp script " \
+                           "(quotes, backslash, newlines, !, or shell expansions)"
     end
 
     def validate_connect_program!
@@ -150,17 +147,15 @@ module ParallelSftp
 
       tokens = sftp_connect_program.to_s.split(/\s+/)
       unless tokens.first == "ssh"
-        raise ArgumentError,
-          "sftp_connect_program must be an allowlisted ssh -o ... form " \
-          "(binary must be ssh; no quotes or shell metacharacters)"
+        raise ArgumentError, "sftp_connect_program must be an allowlisted ssh -o ... form " \
+                             "(binary must be ssh; no quotes or shell metacharacters)"
       end
 
       i = 1
       while i < tokens.length
         unless tokens[i] == "-o"
-          raise ArgumentError,
-            "sftp_connect_program only allows -o key=value after ssh " \
-            "(got #{tokens[i].inspect})"
+          raise ArgumentError, "sftp_connect_program only allows -o key=value after ssh " \
+                               "(got #{tokens[i].inspect})"
         end
         i += 1
         if i >= tokens.length
@@ -169,17 +164,14 @@ module ParallelSftp
 
         key, sep, value = tokens[i].partition("=")
         unless sep == "=" && !key.empty? && !value.empty?
-          raise ArgumentError,
-            "sftp_connect_program: -o requires key=value (got #{tokens[i].inspect})"
+          raise ArgumentError, "sftp_connect_program: -o requires key=value (got #{tokens[i].inspect})"
         end
         unless allowlisted_connect_option?(key)
-          raise ArgumentError,
-            "sftp_connect_program: ssh -o option #{key.inspect} is not allowlisted " \
-            "(allowed: #{ALLOWED_CONNECT_PROGRAM_OPTIONS.join(', ')})"
+          raise ArgumentError, "sftp_connect_program: ssh -o option #{key.inspect} is not allowlisted " \
+                               "(allowed: #{ALLOWED_CONNECT_PROGRAM_OPTIONS.join(', ')})"
         end
         unless value.match?(CONNECT_PROGRAM_OPTION_VALUE)
-          raise ArgumentError,
-            "sftp_connect_program: invalid characters in option value for #{key}"
+          raise ArgumentError, "sftp_connect_program: invalid characters in option value for #{key}"
         end
         i += 1
       end
@@ -192,6 +184,21 @@ module ParallelSftp
     def escaped_user
       # URL-encode user for sftp://user:pass@host (password already encoded)
       user.to_s.gsub(/[^a-zA-Z0-9_.~-]/) { |c| format("%%%02X", c.ord) }
+    end
+
+    # Secure defaults (issue #7). Opt into legacy auto-confirm / no cert verify with insecure: true.
+    def tls_and_host_key_settings
+      if insecure
+        [
+          "set sftp:auto-confirm yes",
+          "set ssl:verify-certificate no"
+        ]
+      else
+        [
+          "set sftp:auto-confirm no",
+          "set ssl:verify-certificate yes"
+        ]
+      end
     end
 
     def escaped_password

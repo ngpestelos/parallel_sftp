@@ -9,6 +9,22 @@ Fast parallel SFTP downloads using lftp's segmented transfer. This gem wraps lft
 - Progress callbacks for monitoring
 - Configurable retry and timeout settings
 - Optimized presets for large files (20GB+)
+- Secure-by-default lftp TLS / host-key settings (opt-in legacy insecure mode)
+
+## Security notes
+
+By default, lftp scripts use:
+
+- `ssl:verify-certificate yes`
+- `sftp:auto-confirm no` (do not auto-accept unknown host keys)
+
+**Breaking change vs ≤0.4.0:** older versions forced certificate verify off and auto-confirmed host keys. To restore that behavior (MITM risk — only for known-broken legacy hosts):
+
+```ruby
+ParallelSftp.configure { |c| c.insecure = true }
+# or per call:
+ParallelSftp.download(..., insecure: true)
+```
 
 ## Requirements
 

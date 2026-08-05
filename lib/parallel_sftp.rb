@@ -120,6 +120,7 @@ module ParallelSftp
         max_retries: options[:max_retries],
         reconnect_interval: options[:reconnect_interval],
         sftp_connect_program: options[:sftp_connect_program],
+        insecure: options.fetch(:insecure, configuration.insecure),
         on_progress: options[:on_progress],
         on_segment_progress: options[:on_segment_progress],
         verbose: options[:verbose]

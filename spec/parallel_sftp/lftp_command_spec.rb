@@ -60,11 +60,23 @@ RSpec.describe ParallelSftp::LftpCommand do
       expect(script).to include("set net:reconnect-interval-base 5")
     end
 
-    it "includes SFTP settings" do
+    it "includes secure TLS and host-key defaults" do
       script = command.to_script
 
-      expect(script).to include("set sftp:auto-confirm yes")
-      expect(script).to include("set ssl:verify-certificate no")
+      expect(script).to include("set sftp:auto-confirm no")
+      expect(script).to include("set ssl:verify-certificate yes")
+      expect(script).not_to include("set sftp:auto-confirm yes")
+      expect(script).not_to include("set ssl:verify-certificate no")
+    end
+
+    context "with insecure: true" do
+      let(:command) { described_class.new(options.merge(insecure: true)) }
+
+      it "restores legacy auto-confirm and disabled cert verify" do
+        script = command.to_script
+        expect(script).to include("set sftp:auto-confirm yes")
+        expect(script).to include("set ssl:verify-certificate no")
+      end
     end
 
     it "includes the open command with credentials" do

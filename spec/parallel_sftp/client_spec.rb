@@ -208,4 +208,57 @@ RSpec.describe ParallelSftp::Client do
       end
     end
   end
+
+  describe "insecure configuration plumbing" do
+    let(:remote_path) { "/data/file.zip" }
+    let(:local_path) { "/tmp/file.zip" }
+
+    after { ParallelSftp.reset_configuration! }
+
+    it "honors configuration.insecure when Client#download omits insecure" do
+      ParallelSftp.configure { |c| c.insecure = true }
+
+      expect(ParallelSftp::LftpCommand).to receive(:new).with(
+        hash_including(insecure: true)
+      ).and_call_original
+
+      download_mock = instance_double(ParallelSftp::Download, execute: local_path)
+      expect(ParallelSftp::Download).to receive(:new).and_return(download_mock)
+
+      client.download(remote_path, local_path)
+    end
+
+    it "honors configuration.insecure via ParallelSftp.download without insecure kwarg" do
+      ParallelSftp.configure { |c| c.insecure = true }
+
+      client_dbl = instance_double(ParallelSftp::Client)
+      expect(ParallelSftp::Client).to receive(:new).and_return(client_dbl)
+      expect(client_dbl).to receive(:download).with(
+        remote_path,
+        local_path,
+        hash_including(insecure: true)
+      ).and_return(local_path)
+
+      ParallelSftp.download(
+        host: "sftp.example.com",
+        user: "testuser",
+        password: "secret123",
+        remote_path: remote_path,
+        local_path: local_path
+      )
+    end
+
+    it "allows per-call insecure: false to override configuration.insecure true" do
+      ParallelSftp.configure { |c| c.insecure = true }
+
+      expect(ParallelSftp::LftpCommand).to receive(:new).with(
+        hash_including(insecure: false)
+      ).and_call_original
+
+      download_mock = instance_double(ParallelSftp::Download, execute: local_path)
+      expect(ParallelSftp::Download).to receive(:new).and_return(download_mock)
+
+      client.download(remote_path, local_path, insecure: false)
+    end
+  end
 end
