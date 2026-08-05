@@ -210,4 +210,30 @@ RSpec.describe ParallelSftp::Download do
       expect(progress_updates.first).to include(:percent)
     end
   end
+
+  describe "verbose stderr redaction" do
+    let(:wait_thr) { instance_double(Process::Waiter, value: double(success?: false, exitstatus: 1)) }
+    subject(:download) { described_class.new(lftp_command, verbose: true) }
+
+    before do
+      allow(Open3).to receive(:popen2e).and_yield(
+        instance_double(IO, close: nil),
+        StringIO.new("Login failed for sftp://user:supersecret@host/path\n"),
+        wait_thr
+      )
+    end
+
+    it "verbose stderr redacts credentials" do
+      stderr = StringIO.new
+      original = $stderr
+      $stderr = stderr
+      begin
+        expect { download.execute }.to raise_error(ParallelSftp::DownloadError)
+      ensure
+        $stderr = original
+      end
+      expect(stderr.string).not_to include("supersecret")
+      expect(stderr.string).to include("***")
+    end
+  end
 end

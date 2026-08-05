@@ -24,6 +24,10 @@ RSpec.describe ParallelSftp::LftpCommand do
       expect(command.port).to eq(22)
     end
 
+    it "inspect does not include password" do
+      expect(command.inspect).not_to include("secret123")
+    end
+
     it "stores file paths" do
       expect(command.remote_path).to eq("/data/large_file.zip")
       expect(command.local_path).to eq("/tmp/large_file.zip")

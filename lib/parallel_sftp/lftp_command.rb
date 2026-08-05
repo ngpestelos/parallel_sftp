@@ -47,7 +47,17 @@ module ParallelSftp
       validate!
     end
 
+<<<<<<< HEAD
     # Generate the lftp script for the download
+=======
+    # Omit @password from default dumps (issue #8).
+    def inspect
+      "#<#{self.class.name}:0x#{format('%x', object_id)} @host=#{host.inspect} @user=#{user.inspect} @port=#{port.inspect}>"
+    end
+
+
+    # Generate the lftp script for download
+>>>>>>> 1383ed0 (security: redact verbose stderr and omit password from inspect)
     def to_script
       lines = [
         "set net:timeout #{timeout}",

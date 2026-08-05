@@ -56,6 +56,7 @@ module ParallelSftp
           # Start background polling for segment progress
           start_segment_polling(status_file) if on_segment_progress
 
+<<<<<<< HEAD
           stdout_stderr.each_line do |line|
             @output_buffer << line
             $stderr.puts "[lftp] #{line}" if @verbose
@@ -63,6 +64,13 @@ module ParallelSftp
           end
 
           exit_status = wait_thr.value
+=======
+        stdout_stderr.each_line do |line|
+          safe = redact_secrets(line)
+          @output_buffer << safe
+          $stderr.puts "[lftp] #{safe}" if @verbose
+          process_output_line(line)
+>>>>>>> 1383ed0 (security: redact verbose stderr and omit password from inspect)
         end
       end
 
