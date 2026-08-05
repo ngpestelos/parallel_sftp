@@ -18,12 +18,13 @@ RSpec.describe ParallelSftp::Client do
       expect(client.host).to eq("sftp.example.com")
       expect(client.user).to eq("testuser")
       expect(client).not_to respond_to(:password)
-    
+    end
+
     it "inspect does not include password" do
       expect(client.inspect).not_to include("secret123")
       expect(client.inspect).to include("sftp.example.com")
     end
-    end
+
 
     it "uses default port" do
       expect(client.port).to eq(22)
